@@ -1,0 +1,47 @@
+import speech_recognition as sr
+from pydub import AudioSegment
+from pydub.utils import make_chunks
+from concurrent.futures import ThreadPoolExecutor
+
+# Inicializa el reconocimiento de voz
+r = sr.Recognizer()
+
+# Carga el archivo de audio y convierte a WAV
+audio_file = AudioSegment.from_file("/content/drive/MyDrive/notas de voz/Universidad Anahuac.m4a", format="m4a")
+audio_file.export("/content/drive/MyDrive/notas de voz/audio.wav", format="wav")
+
+# Divide el audio en trozos de 10 segundos
+chunk_length_ms = 10000
+chunks = make_chunks(audio_file, chunk_length_ms)
+
+# Define una función que transcriba un trozo de audio
+def transcribir(chunk):
+    texto = ""
+    with sr.AudioFile(chunk) as source:
+        audio = r.record(source)
+        try:
+            texto = r.recognize_google(audio, language="es-ES")
+        except:
+            pass
+    return texto
+
+# Crea un conjunto de trabajadores para procesar los trozos de audio en paralelo
+texto = ""
+with ThreadPoolExecutor() as executor:
+    futures = []
+    for i, chunk in enumerate(chunks):
+        chunk.export("chunk{}.wav".format(i), format="wav")
+        future = executor.submit(transcribir, "chunk{}.wav".format(i))
+        futures.append(future)
+
+    # Escribe la transcripción a medida que se va generando
+    for future in futures:
+        texto += future.result() + " "
+    print("Transcripción completa del audio finalizada.")
+    print("Texto completo:")
+    print(texto)
+    
+# Guarda el texto en un archivo txt
+with open("transcripcion.txt", "w", encoding="utf-8") as archivo:
+    archivo.write(texto)
+    print("Archivo de transcripción generado.")
